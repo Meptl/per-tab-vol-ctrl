@@ -268,12 +268,22 @@
       return;
     }
 
+    const currentTabOverride =
+      Number.isInteger(currentTabId) && tabOverrides[String(currentTabId)]
+        ? tabOverrides[String(currentTabId)]
+        : null;
+    const shouldHighlightCurrentDomainRule = !(currentTabOverride && currentTabOverride.active !== false);
+
     const orderedRules = [...rules].sort((a, b) => {
       const aMatchesCurrent = Boolean(
-        currentUrl && globalThis.VolumeMatcher.matchesPattern(a.pattern, currentUrl)
+        shouldHighlightCurrentDomainRule &&
+          currentUrl &&
+          globalThis.VolumeMatcher.matchesPattern(a.pattern, currentUrl)
       );
       const bMatchesCurrent = Boolean(
-        currentUrl && globalThis.VolumeMatcher.matchesPattern(b.pattern, currentUrl)
+        shouldHighlightCurrentDomainRule &&
+          currentUrl &&
+          globalThis.VolumeMatcher.matchesPattern(b.pattern, currentUrl)
       );
 
       if (aMatchesCurrent !== bMatchesCurrent) {
@@ -284,7 +294,11 @@
     });
 
     for (const rule of orderedRules) {
-      const matchesCurrent = currentUrl && globalThis.VolumeMatcher.matchesPattern(rule.pattern, currentUrl);
+      const matchesCurrent = Boolean(
+        shouldHighlightCurrentDomainRule &&
+          currentUrl &&
+          globalThis.VolumeMatcher.matchesPattern(rule.pattern, currentUrl)
+      );
       const item = createVolumeControlItem({
         label: rule.pattern,
         volume: Number.isFinite(rule.volume) ? rule.volume : 100,
@@ -396,6 +410,7 @@
           tabOverrides[String(entry.tabId)] = nextOverride;
           persistTabOverride(entry.tabId, nextOverride)
             .then(() => {
+              renderRules();
               renderTabOverrides().catch(() => {
                 setStatus("Could not render tab overrides.");
               });
@@ -413,6 +428,7 @@
 
           tabOverrides[String(entry.tabId)] = nextOverride;
           entry.override = nextOverride;
+          renderRules();
           persistTabOverride(entry.tabId, nextOverride).catch(() => {
             setStatus("Could not save tab override.");
           });
@@ -421,6 +437,7 @@
           delete tabOverrides[String(entry.tabId)];
           persistTabOverride(entry.tabId, null)
             .then(() => {
+              renderRules();
               renderTabOverrides().catch(() => {
                 setStatus("Could not render tab overrides.");
               });
