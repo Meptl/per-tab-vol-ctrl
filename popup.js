@@ -104,7 +104,6 @@
   function createEmptyMessage() {
     const item = document.createElement("li");
     item.className = "empty";
-    item.textContent = "No rules yet. Add one above.";
     return item;
   }
 

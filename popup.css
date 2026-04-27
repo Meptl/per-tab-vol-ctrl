@@ -1,13 +1,10 @@
 :root {
-  color-scheme: light;
   font-family: "Segoe UI", sans-serif;
 }
 
 body {
   margin: 0;
   min-width: 360px;
-  background: #f7f8fb;
-  color: #1a1d29;
 }
 
 .app {
@@ -38,16 +35,13 @@ h1 {
 input[type="text"] {
   flex: 1;
   padding: 8px;
-  border: 1px solid #c5cad8;
-  border-radius: 6px;
+  border: 1px solid;
   font-size: 13px;
 }
 
 button {
-  border: 0;
-  border-radius: 6px;
-  background: #0d66d0;
-  color: #fff;
+  border: 1px solid;
+  border-radius: 0;
   padding: 8px 12px;
   font-weight: 600;
   cursor: pointer;
@@ -56,7 +50,6 @@ button {
 .hint {
   margin: 6px 0 0;
   font-size: 11px;
-  color: #4d5570;
 }
 
 .status {
@@ -66,7 +59,6 @@ button {
 
 .status {
   min-height: 16px;
-  color: #8b2e00;
 }
 
 .rules-list {
@@ -78,9 +70,8 @@ button {
 }
 
 .rule-item {
-  background: #fff;
-  border: 1px solid #dde2ee;
-  border-radius: 8px;
+  border: 1px solid;
+  border-radius: 0;
   padding: 8px;
 }
 
@@ -109,8 +100,6 @@ button {
 }
 
 .rule-item-current {
-  background: #eaf8ee;
-  border-color: #b9dfc4;
 }
 
 .mute-btn,
@@ -118,10 +107,8 @@ button {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid #c5cad8;
-  border-radius: 999px;
-  background: #fff;
-  color: #2f364c;
+  border: 1px solid;
+  border-radius: 0;
   font-size: 12px;
   line-height: 1;
 }
@@ -131,7 +118,6 @@ button {
 }
 
 .delete-btn {
-  color: #b42318;
   font-weight: 700;
 }
 
@@ -148,5 +134,4 @@ input[type="range"] {
 .empty {
   margin: 12px 0 0;
   font-size: 12px;
-  color: #4d5570;
 }
