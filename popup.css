@@ -78,7 +78,7 @@ button {
 
 .rule-item {
   border: none;
-  padding: 6px 0;
+  padding: 6px 8px;
 }
 
 .rule-item + .rule-item {
@@ -146,6 +146,21 @@ button {
   border-radius: 0;
   font-size: 12px;
   line-height: 1;
+  transition: background-color 120ms ease-in-out;
+}
+
+.mute-btn:hover,
+.delete-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.mute-btn:focus-visible,
+.delete-btn:focus-visible {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.mute-btn {
+  margin-right: -4px;
 }
 
 .delete-btn {
