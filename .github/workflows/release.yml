@@ -30,8 +30,16 @@ jobs:
         run: |
           sed -i 's/"version": "0.0.0.1"/"version": "'"${{ github.ref_name }}"'"/' manifest.json
 
-      - name: Build unsigned artifact
+      - name: Build unsigned artifact (main branch)
+        if: github.ref == 'refs/heads/main'
         run: web-ext build --overwrite-dest --artifacts-dir ./artifacts
+
+      - name: Sign and Publish artifact (tags)
+        if: github.ref_type == 'tag'
+        env:
+          FIREFOX_ISSUER: ${{ secrets.FIREFOX_ISSUER }}
+          FIREFOX_SECRET: ${{ secrets.FIREFOX_SECRET }}
+        run: web-ext sign --channel unlisted --artifacts-dir ./artifacts --api-key $FIREFOX_ISSUER --api-secret $FIREFOX_SECRET
 
       - name: Delete existing release
         env:
