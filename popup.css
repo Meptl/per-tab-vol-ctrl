@@ -4,7 +4,9 @@
 
 body {
   margin: 0;
-  min-width: 360px;
+  width: 500px;
+  min-width: 500px;
+  max-width: 500px;
 }
 
 .app {
@@ -82,7 +84,7 @@ button {
 
 .rule-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(88px, 120px) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(66px, 90px) auto;
   align-items: center;
   gap: 8px;
 }
@@ -153,14 +155,9 @@ button {
   margin: 0 auto;
 }
 
-.volume-value {
-  min-width: 38px;
-  font-size: 12px;
-  text-align: right;
-}
-
 input[type="range"] {
-  width: 100%;
+  width: 75%;
+  justify-self: start;
 }
 
 .empty {

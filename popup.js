@@ -195,6 +195,23 @@
     return item;
   }
 
+  function updateTruncationTooltip(element, fullText) {
+    const text = typeof fullText === "string" ? fullText.trim() : "";
+    if (!text) {
+      element.removeAttribute("title");
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const isTruncated = element.scrollWidth > element.clientWidth;
+      if (isTruncated) {
+        element.setAttribute("title", text);
+      } else {
+        element.removeAttribute("title");
+      }
+    });
+  }
+
   function createVolumeControlItem({
     label,
     labelElement,
@@ -226,6 +243,7 @@
       const pattern = document.createElement("p");
       pattern.className = "pattern";
       pattern.textContent = label;
+      updateTruncationTooltip(pattern, label);
       meta.appendChild(pattern);
     }
 
@@ -243,13 +261,8 @@
     slider.step = "1";
     slider.value = String(volume);
 
-    const value = document.createElement("output");
-    value.className = "volume-value";
-    value.textContent = `${slider.value}%`;
-
     slider.addEventListener("input", () => {
       const nextVolume = Number(slider.value);
-      value.textContent = `${slider.value}%`;
       onVolumeInput(nextVolume);
     });
 
@@ -260,7 +273,7 @@
     remove.setAttribute("aria-label", removeAriaLabel);
     remove.addEventListener("click", onRemove);
 
-    row.append(meta, mute, slider, value, remove);
+    row.append(meta, mute, slider, remove);
     li.appendChild(row);
 
     return li;
@@ -378,7 +391,9 @@
 
     const title = document.createElement("p");
     title.className = "tab-entry-title";
-    title.textContent = getTabDisplayTitle(tab, tabId);
+    const displayTitle = getTabDisplayTitle(tab, tabId);
+    title.textContent = displayTitle;
+    updateTruncationTooltip(title, displayTitle);
     wrapper.appendChild(title);
 
     return wrapper;
