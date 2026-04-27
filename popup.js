@@ -197,6 +197,7 @@
 
   function createVolumeControlItem({
     label,
+    labelElement,
     volume,
     muted,
     isCurrent,
@@ -219,10 +220,14 @@
     const meta = document.createElement("div");
     meta.className = "rule-meta";
 
-    const pattern = document.createElement("p");
-    pattern.className = "pattern";
-    pattern.textContent = label;
-    meta.appendChild(pattern);
+    if (labelElement) {
+      meta.appendChild(labelElement);
+    } else {
+      const pattern = document.createElement("p");
+      pattern.className = "pattern";
+      pattern.textContent = label;
+      meta.appendChild(pattern);
+    }
 
     const mute = document.createElement("button");
     mute.type = "button";
@@ -339,6 +344,46 @@
     }
   }
 
+  function getTabDisplayTitle(tab, tabId) {
+    const rawTitle = tab && typeof tab.title === "string" ? tab.title.trim() : "";
+    if (rawTitle) {
+      return rawTitle;
+    }
+
+    const fallbackUrl = tab && typeof tab.url === "string" ? tab.url : "";
+    if (fallbackUrl) {
+      return fallbackUrl;
+    }
+
+    return `Tab ${tabId}`;
+  }
+
+  function createTabEntryLabel(tab, tabId) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "tab-entry-label";
+
+    const faviconUrl = tab && typeof tab.favIconUrl === "string" ? tab.favIconUrl : "";
+    if (faviconUrl) {
+      const favicon = document.createElement("img");
+      favicon.className = "tab-entry-favicon";
+      favicon.src = faviconUrl;
+      favicon.alt = "";
+      favicon.loading = "lazy";
+      favicon.referrerPolicy = "no-referrer";
+      favicon.addEventListener("error", () => {
+        favicon.remove();
+      });
+      wrapper.appendChild(favicon);
+    }
+
+    const title = document.createElement("p");
+    title.className = "tab-entry-title";
+    title.textContent = getTabDisplayTitle(tab, tabId);
+    wrapper.appendChild(title);
+
+    return wrapper;
+  }
+
   async function renderTabOverrides() {
     tabOverridesList.textContent = "";
 
@@ -386,16 +431,15 @@
         return aIsCurrent ? -1 : 1;
       }
 
-      const aLabel = (a.tab && (a.tab.url || a.tab.title)) || `Tab ${a.tabId}`;
-      const bLabel = (b.tab && (b.tab.url || b.tab.title)) || `Tab ${b.tabId}`;
+      const aLabel = getTabDisplayTitle(a.tab, a.tabId);
+      const bLabel = getTabDisplayTitle(b.tab, b.tabId);
       return aLabel.localeCompare(bLabel);
     });
 
     for (const entry of entriesWithTabInfo) {
-      const label = (entry.tab && (entry.tab.url || entry.tab.title)) || `Tab ${entry.tabId}`;
-
       const item = createVolumeControlItem({
-        label,
+        label: getTabDisplayTitle(entry.tab, entry.tabId),
+        labelElement: createTabEntryLabel(entry.tab, entry.tabId),
         volume: entry.override.volume,
         muted: entry.override.muted,
         isCurrent: entry.tabId === currentTabId,

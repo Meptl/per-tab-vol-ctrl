@@ -104,6 +104,28 @@ button {
   text-overflow: ellipsis;
 }
 
+.tab-entry-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-entry-favicon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.tab-entry-title {
+  margin: 0;
+  font-size: 12px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .rule-item-current {
   background: #eaf8ee;
   border-color: #b9dfc4;
