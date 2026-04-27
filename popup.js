@@ -115,7 +115,22 @@
       return;
     }
 
-    for (const rule of rules) {
+    const orderedRules = [...rules].sort((a, b) => {
+      const aMatchesCurrent = Boolean(
+        currentUrl && globalThis.VolumeMatcher.matchesPattern(a.pattern, currentUrl)
+      );
+      const bMatchesCurrent = Boolean(
+        currentUrl && globalThis.VolumeMatcher.matchesPattern(b.pattern, currentUrl)
+      );
+
+      if (aMatchesCurrent !== bMatchesCurrent) {
+        return aMatchesCurrent ? -1 : 1;
+      }
+
+      return a.pattern.localeCompare(b.pattern);
+    });
+
+    for (const rule of orderedRules) {
       const li = document.createElement("li");
       li.className = "rule-item";
 
@@ -131,10 +146,7 @@
 
       const matchesCurrent = currentUrl && globalThis.VolumeMatcher.matchesPattern(rule.pattern, currentUrl);
       if (matchesCurrent) {
-        const tag = document.createElement("span");
-        tag.className = "tag";
-        tag.textContent = "matches current tab";
-        left.appendChild(tag);
+        li.classList.add("rule-item-current");
       }
 
       const remove = document.createElement("button");

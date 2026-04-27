@@ -98,14 +98,9 @@ button {
   word-break: break-all;
 }
 
-.tag {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  background: #daf0df;
-  color: #1f6a31;
+.rule-item-current {
+  background: #eaf8ee;
+  border-color: #b9dfc4;
 }
 
 .delete-btn {
