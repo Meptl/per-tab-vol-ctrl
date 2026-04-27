@@ -129,7 +129,7 @@
   async function refreshVolumeFromRules() {
     try {
       const stored = await storageGet({ [RULES_KEY]: [] });
-      const rules = Array.isArray(stored[RULES_KEY]) ? stored[RULES_KEY] : [];
+      const rules = globalThis.VolumeMatcher.normalizeStoredRules(stored[RULES_KEY]);
       const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
       if (matched && matched.muted === true) {
         activeVolume = 0;

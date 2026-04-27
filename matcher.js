@@ -71,6 +71,49 @@
     return value.replace(WILDCARD, "").length;
   }
 
+  function clampRuleVolume(value) {
+    if (!Number.isFinite(value)) {
+      return 100;
+    }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  function normalizeStoredRules(input) {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+
+    const deduped = new Set();
+    const normalized = [];
+
+    for (const candidate of input) {
+      if (!candidate || typeof candidate !== "object") {
+        continue;
+      }
+
+      let pattern;
+      try {
+        pattern = normalizeRulePattern(candidate.pattern);
+      } catch {
+        continue;
+      }
+
+      const dedupeKey = pattern.toLowerCase();
+      if (deduped.has(dedupeKey)) {
+        continue;
+      }
+      deduped.add(dedupeKey);
+
+      normalized.push({
+        pattern,
+        volume: clampRuleVolume(candidate.volume),
+        muted: candidate.muted === true
+      });
+    }
+
+    return normalized;
+  }
+
   function findBestRule(rules, urlString) {
     if (!Array.isArray(rules) || !urlString) {
       return null;
@@ -90,6 +133,7 @@
 
   globalThis.VolumeMatcher = {
     normalizeRulePattern,
+    normalizeStoredRules,
     getDefaultPatternForUrl,
     matchesPattern,
     findBestRule

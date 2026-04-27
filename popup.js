@@ -84,6 +84,7 @@
   }
 
   async function persistRules() {
+    rules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
     await storageSet({ [RULES_KEY]: rules });
   }
 
@@ -174,7 +175,11 @@
       value.textContent = `${slider.value}%`;
 
       slider.addEventListener("input", () => {
+        rule.volume = Number(slider.value);
         value.textContent = `${slider.value}%`;
+        persistRules().catch(() => {
+          setStatus("Could not save extension state.");
+        });
       });
 
       const remove = document.createElement("button");
@@ -186,12 +191,6 @@
         rules = rules.filter((item) => item.pattern !== rule.pattern);
         await persistRules();
         renderRules();
-      });
-
-      slider.addEventListener("change", async () => {
-        const nextVolume = Number(slider.value);
-        rule.volume = nextVolume;
-        await persistRules();
       });
 
       row.append(meta, mute, slider, value, remove);
@@ -226,7 +225,7 @@
 
   async function initialize() {
     const stored = await storageGet({ [RULES_KEY]: [] });
-    rules = Array.isArray(stored[RULES_KEY]) ? stored[RULES_KEY] : [];
+    rules = globalThis.VolumeMatcher.normalizeStoredRules(stored[RULES_KEY]);
     sortRules();
     await refreshCurrentTab();
     renderRules();
