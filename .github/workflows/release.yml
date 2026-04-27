@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -59,7 +61,6 @@ jobs:
           body: ${{ github.ref == 'refs/heads/main' && github.event.head_commit.message || '' }}
           draft: false
           prerelease: ${{ github.ref == 'refs/heads/main' }}
-          latest: ${{ github.ref_type == 'tag' }}
 
       - name: Find Release Asset
         id: find_asset
