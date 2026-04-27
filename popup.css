@@ -100,6 +100,8 @@ button {
 }
 
 .rule-item-current {
+  background: #eaf8ee;
+  border-color: #b9dfc4;
 }
 
 .mute-btn,
