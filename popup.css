@@ -84,7 +84,7 @@ button {
 
 .rule-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(66px, 90px) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 8px;
 }
@@ -156,8 +156,8 @@ button {
 }
 
 input[type="range"] {
-  width: 75%;
-  justify-self: start;
+  width: 90px;
+  min-width: 90px;
 }
 
 .empty {
