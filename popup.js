@@ -5,7 +5,6 @@
   const form = document.getElementById("add-rule-form");
   const patternInput = document.getElementById("pattern-input");
   const statusEl = document.getElementById("status");
-  const currentUrlEl = document.getElementById("current-url");
 
   let rules = [];
   let currentUrl = "";
@@ -94,13 +93,10 @@
     currentUrl = tab && tab.url ? tab.url : "";
 
     if (currentUrl) {
-      currentUrlEl.textContent = `Current page: ${currentUrl}`;
       const defaultPattern = globalThis.VolumeMatcher.getDefaultPatternForUrl(currentUrl);
       if (defaultPattern) {
         patternInput.value = defaultPattern;
       }
-    } else {
-      currentUrlEl.textContent = "Current page: unavailable";
     }
   }
 
