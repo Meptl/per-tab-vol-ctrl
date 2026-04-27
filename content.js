@@ -1,7 +1,7 @@
 (() => {
   const extApi = globalThis.browser || globalThis.chrome;
   const RULES_KEY = "volumeRules";
-  let activeVolume = 100;
+  let activeVolume = null;
 
   function storageGet(defaults) {
     try {
@@ -26,6 +26,9 @@
   }
 
   function setMediaVolume(media) {
+    if (!Number.isFinite(activeVolume)) {
+      return;
+    }
     media.volume = Math.max(0, Math.min(1, activeVolume / 100));
   }
 
@@ -73,8 +76,10 @@
       const stored = await storageGet({ [RULES_KEY]: [] });
       const rules = Array.isArray(stored[RULES_KEY]) ? stored[RULES_KEY] : [];
       const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
-      activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : 100;
-      applyVolumeToPage();
+      activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+      if (Number.isFinite(activeVolume)) {
+        applyVolumeToPage();
+      }
     } catch {
       // Ignore storage read failures and keep default volume.
     }
