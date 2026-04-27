@@ -4,6 +4,13 @@
   "version": "0.0.0.1",
   "description": "Per-tab and per-domain volume control for tabs.",
   "permissions": ["storage", "tabs", "menus"],
+  "browser_specific_settings": {
+    "gecko": {
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "action": {
     "default_title": "per-tab-vol-ctrl",
     "default_popup": "popup.html",
