@@ -25,6 +25,26 @@
     await storageSessionSet({ [TAB_OVERRIDES_KEY]: nextOverrides });
   }
 
+  async function ensureTabOverride(tabId) {
+    const tabKey = String(tabId);
+    const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
+    const overrides = stored[TAB_OVERRIDES_KEY] || {};
+    if (tabKey in overrides) {
+      return;
+    }
+
+    await storageSessionSet({
+      [TAB_OVERRIDES_KEY]: {
+        ...overrides,
+        [tabKey]: {
+          volume: 100,
+          muted: false,
+          active: false
+        }
+      }
+    });
+  }
+
   async function consumePopupTargetTabId() {
     const stored = await storageSessionGet({ [POPUP_TARGET_TAB_ID_KEY]: null });
     const tabId = Number.isInteger(stored[POPUP_TARGET_TAB_ID_KEY])
@@ -66,6 +86,7 @@
     }
 
     try {
+      await ensureTabOverride(tab.id);
       await storageSessionSet({ [POPUP_TARGET_TAB_ID_KEY]: tab.id });
       await extApi.action.openPopup({ windowId: tab.windowId });
     } catch {

@@ -3,15 +3,10 @@
   const RULES_KEY = "volumeRules";
   const TAB_OVERRIDES_KEY = "tabVolumeOverrides";
   const rulesList = document.getElementById("rules-list");
+  const tabOverridesList = document.getElementById("tab-overrides-list");
   const form = document.getElementById("add-rule-form");
   const patternInput = document.getElementById("pattern-input");
   const statusEl = document.getElementById("status");
-  const tabLabelEl = document.getElementById("tab-label");
-  const tabSliderEl = document.getElementById("tab-volume-slider");
-  const tabValueEl = document.getElementById("tab-volume-value");
-  const tabMuteEl = document.getElementById("tab-mute-btn");
-  const tabClearEl = document.getElementById("tab-clear-btn");
-  const tabStateEl = document.getElementById("tab-state");
   const SVG_NS = "http://www.w3.org/2000/svg";
   const ICON_PATHS = {
     volume: [
@@ -25,16 +20,13 @@
       "M9.069 5.054l.431 -.554a.8 .8 0 0 1 1.5 .5v2m0 4v8a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l1.294 -1.664",
       "M3 3l18 18"
     ],
-    x: [
-      "M18 6l-12 12",
-      "M6 6l12 12"
-    ]
+    x: ["M18 6l-12 12", "M6 6l12 12"]
   };
 
   let rules = [];
   let currentUrl = "";
   let currentTabId = null;
-  let tabOverride = null;
+  let tabOverrides = {};
 
   function clampPercent(value) {
     if (!Number.isFinite(value)) {
@@ -50,8 +42,25 @@
 
     return {
       volume: clampPercent(candidate.volume),
-      muted: candidate.muted === true
+      muted: candidate.muted === true,
+      active: candidate.active !== false
     };
+  }
+
+  function normalizeTabOverrides(candidate) {
+    if (!candidate || typeof candidate !== "object") {
+      return {};
+    }
+
+    const normalized = {};
+    for (const [tabId, value] of Object.entries(candidate)) {
+      const override = normalizeTabOverride(value);
+      if (override) {
+        normalized[tabId] = override;
+      }
+    }
+
+    return normalized;
   }
 
   function storageGet(defaults) {
@@ -96,6 +105,25 @@
     const normalizedRules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
     await storageSet({ [RULES_KEY]: normalizedRules });
     await tabsSendMessage(currentTabId, { type: "volumeRulesUpdated", rules: normalizedRules });
+  }
+
+  async function persistTabOverride(tabId, nextOverride) {
+    if (!Number.isInteger(tabId)) {
+      return;
+    }
+
+    const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
+    const overrides = normalizeTabOverrides(stored[TAB_OVERRIDES_KEY]);
+    const nextOverrides = { ...overrides };
+
+    if (nextOverride) {
+      nextOverrides[String(tabId)] = nextOverride;
+    } else {
+      delete nextOverrides[String(tabId)];
+    }
+
+    await storageSessionSet({ [TAB_OVERRIDES_KEY]: nextOverrides });
+    await tabsSendMessage(tabId, { type: "tabVolumeOverrideUpdated", override: nextOverride });
   }
 
   function setStatus(message) {
@@ -154,46 +182,89 @@
     currentUrl = tab && tab.url ? tab.url : "";
   }
 
-  async function readCurrentTabOverride() {
-    if (!Number.isInteger(currentTabId)) {
-      tabOverride = null;
-      return;
-    }
-
+  async function readTabOverrides() {
     const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
-    const overrides = stored[TAB_OVERRIDES_KEY] || {};
-    tabOverride = normalizeTabOverride(overrides[String(currentTabId)]);
+    tabOverrides = normalizeTabOverrides(stored[TAB_OVERRIDES_KEY]);
   }
 
-  async function persistTabOverride(nextOverride) {
-    if (!Number.isInteger(currentTabId)) {
-      return;
-    }
-
-    const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
-    const overrides = stored[TAB_OVERRIDES_KEY] || {};
-    const nextOverrides = { ...overrides };
-    if (nextOverride) {
-      nextOverrides[String(currentTabId)] = nextOverride;
-    } else {
-      delete nextOverrides[String(currentTabId)];
-    }
-
-    await storageSessionSet({ [TAB_OVERRIDES_KEY]: nextOverrides });
-    await tabsSendMessage(currentTabId, { type: "tabVolumeOverrideUpdated", override: nextOverride });
-  }
-
-  function createEmptyMessage() {
+  function createEmptyMessage(message) {
     const item = document.createElement("li");
     item.className = "empty";
+    item.textContent = message;
     return item;
+  }
+
+  function createVolumeControlItem({
+    label,
+    volume,
+    muted,
+    isCurrent,
+    muteAriaLabel,
+    removeAriaLabel,
+    onToggleMute,
+    onVolumeInput,
+    onRemove
+  }) {
+    const li = document.createElement("li");
+    li.className = "rule-item";
+
+    if (isCurrent) {
+      li.classList.add("rule-item-current");
+    }
+
+    const row = document.createElement("div");
+    row.className = "rule-row";
+
+    const meta = document.createElement("div");
+    meta.className = "rule-meta";
+
+    const pattern = document.createElement("p");
+    pattern.className = "pattern";
+    pattern.textContent = label;
+    meta.appendChild(pattern);
+
+    const mute = document.createElement("button");
+    mute.type = "button";
+    mute.className = "mute-btn";
+    mute.appendChild(createIcon(muted ? "volumeOff" : "volume"));
+    mute.setAttribute("aria-label", muteAriaLabel);
+    mute.addEventListener("click", onToggleMute);
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = "100";
+    slider.step = "1";
+    slider.value = String(volume);
+
+    const value = document.createElement("output");
+    value.className = "volume-value";
+    value.textContent = `${slider.value}%`;
+
+    slider.addEventListener("input", () => {
+      const nextVolume = Number(slider.value);
+      value.textContent = `${slider.value}%`;
+      onVolumeInput(nextVolume);
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "delete-btn";
+    remove.appendChild(createIcon("x"));
+    remove.setAttribute("aria-label", removeAriaLabel);
+    remove.addEventListener("click", onRemove);
+
+    row.append(meta, mute, slider, value, remove);
+    li.appendChild(row);
+
+    return li;
   }
 
   function renderRules() {
     rulesList.textContent = "";
 
     if (rules.length === 0) {
-      rulesList.appendChild(createEmptyMessage());
+      rulesList.appendChild(createEmptyMessage("No domain rules."));
       return;
     }
 
@@ -213,132 +284,156 @@
     });
 
     for (const rule of orderedRules) {
-      const li = document.createElement("li");
-      li.className = "rule-item";
-
-      const row = document.createElement("div");
-      row.className = "rule-row";
-
-      const meta = document.createElement("div");
-      meta.className = "rule-meta";
-
-      const pattern = document.createElement("p");
-      pattern.className = "pattern";
-      pattern.textContent = rule.pattern;
-      meta.appendChild(pattern);
-
       const matchesCurrent = currentUrl && globalThis.VolumeMatcher.matchesPattern(rule.pattern, currentUrl);
-      if (matchesCurrent) {
-        li.classList.add("rule-item-current");
-      }
-
-      const mute = document.createElement("button");
-      mute.type = "button";
-      mute.className = "mute-btn";
-      const isMuted = rule.muted === true;
-      mute.appendChild(createIcon(isMuted ? "volumeOff" : "volume"));
-      mute.setAttribute("aria-label", isMuted ? "Unmute rule" : "Mute rule");
-      mute.addEventListener("click", async () => {
-        rule.muted = !(rule.muted === true);
-        await persistRules();
-        renderRules();
+      const item = createVolumeControlItem({
+        label: rule.pattern,
+        volume: Number.isFinite(rule.volume) ? rule.volume : 100,
+        muted: rule.muted === true,
+        isCurrent: matchesCurrent,
+        muteAriaLabel: rule.muted === true ? "Unmute rule" : "Mute rule",
+        removeAriaLabel: `Remove ${rule.pattern}`,
+        onToggleMute: () => {
+          rule.muted = !(rule.muted === true);
+          persistRules()
+            .then(() => {
+              renderRules();
+            })
+            .catch(() => {
+              setStatus("Could not save extension state.");
+            });
+        },
+        onVolumeInput: (nextVolume) => {
+          rule.volume = nextVolume;
+          persistRules().catch(() => {
+            setStatus("Could not save extension state.");
+          });
+        },
+        onRemove: () => {
+          rules = rules.filter((entry) => entry.pattern !== rule.pattern);
+          persistRules()
+            .then(() => {
+              renderRules();
+            })
+            .catch(() => {
+              setStatus("Could not save extension state.");
+            });
+        }
       });
 
-      const slider = document.createElement("input");
-      slider.type = "range";
-      slider.min = "0";
-      slider.max = "100";
-      slider.step = "1";
-      slider.value = String(Number.isFinite(rule.volume) ? rule.volume : 100);
-
-      const value = document.createElement("output");
-      value.className = "volume-value";
-      value.textContent = `${slider.value}%`;
-
-      slider.addEventListener("input", () => {
-        rule.volume = Number(slider.value);
-        value.textContent = `${slider.value}%`;
-        persistRules().catch(() => {
-          setStatus("Could not save extension state.");
-        });
-      });
-
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "delete-btn";
-      remove.appendChild(createIcon("x"));
-      remove.setAttribute("aria-label", `Remove ${rule.pattern}`);
-      remove.addEventListener("click", async () => {
-        rules = rules.filter((item) => item.pattern !== rule.pattern);
-        await persistRules();
-        renderRules();
-      });
-
-      row.append(meta, mute, slider, value, remove);
-      li.appendChild(row);
-
-      rulesList.appendChild(li);
+      rulesList.appendChild(item);
     }
   }
 
-  function renderTabOverride() {
-    const hasTab = Number.isInteger(currentTabId);
-    tabSliderEl.disabled = !hasTab;
-    tabMuteEl.disabled = !hasTab;
-    tabClearEl.disabled = !hasTab;
+  async function renderTabOverrides() {
+    tabOverridesList.textContent = "";
 
-    if (!hasTab) {
-      tabLabelEl.textContent = "No tab selected";
-      tabSliderEl.value = "100";
-      tabValueEl.textContent = "100%";
-      tabStateEl.textContent = "Tab override unavailable";
-      tabMuteEl.textContent = "Mute";
+    const entries = Object.entries(tabOverrides)
+      .map(([tabId, override]) => {
+        const numericTabId = Number(tabId);
+        if (!Number.isInteger(numericTabId)) {
+          return null;
+        }
+
+        return {
+          tabId: numericTabId,
+          override
+        };
+      })
+      .filter(Boolean);
+
+    if (entries.length === 0) {
+      tabOverridesList.appendChild(createEmptyMessage("No tab overrides yet. Use tab context menu: Set tab volume."));
       return;
     }
 
-    tabLabelEl.textContent = currentUrl || `Tab ${currentTabId}`;
+    const entriesWithTabInfo = await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const tab = await tabsGet(entry.tabId);
+          return {
+            ...entry,
+            tab
+          };
+        } catch {
+          return {
+            ...entry,
+            tab: null
+          };
+        }
+      })
+    );
 
-    const effective = tabOverride || { volume: 100, muted: false };
-    tabSliderEl.value = String(effective.volume);
-    tabValueEl.textContent = `${effective.volume}%`;
-    tabMuteEl.textContent = effective.muted ? "Unmute" : "Mute";
-    tabStateEl.textContent = tabOverride ? "Tab override is active" : "Using domain rule";
+    entriesWithTabInfo.sort((a, b) => {
+      const aIsCurrent = a.tabId === currentTabId;
+      const bIsCurrent = b.tabId === currentTabId;
+
+      if (aIsCurrent !== bIsCurrent) {
+        return aIsCurrent ? -1 : 1;
+      }
+
+      const aLabel = (a.tab && (a.tab.url || a.tab.title)) || `Tab ${a.tabId}`;
+      const bLabel = (b.tab && (b.tab.url || b.tab.title)) || `Tab ${b.tabId}`;
+      return aLabel.localeCompare(bLabel);
+    });
+
+    for (const entry of entriesWithTabInfo) {
+      const label = (entry.tab && (entry.tab.url || entry.tab.title)) || `Tab ${entry.tabId}`;
+
+      const item = createVolumeControlItem({
+        label,
+        volume: entry.override.volume,
+        muted: entry.override.muted,
+        isCurrent: entry.tabId === currentTabId,
+        muteAriaLabel: entry.override.muted ? "Unmute tab override" : "Mute tab override",
+        removeAriaLabel: `Clear override for tab ${entry.tabId}`,
+        onToggleMute: () => {
+          const nextOverride = {
+            volume: entry.override.volume,
+            muted: !entry.override.muted,
+            active: true
+          };
+
+          tabOverrides[String(entry.tabId)] = nextOverride;
+          persistTabOverride(entry.tabId, nextOverride)
+            .then(() => {
+              renderTabOverrides().catch(() => {
+                setStatus("Could not render tab overrides.");
+              });
+            })
+            .catch(() => {
+              setStatus("Could not save tab override.");
+            });
+        },
+        onVolumeInput: (nextVolume) => {
+          const nextOverride = {
+            volume: clampPercent(nextVolume),
+            muted: entry.override.muted,
+            active: true
+          };
+
+          tabOverrides[String(entry.tabId)] = nextOverride;
+          entry.override = nextOverride;
+          persistTabOverride(entry.tabId, nextOverride).catch(() => {
+            setStatus("Could not save tab override.");
+          });
+        },
+        onRemove: () => {
+          delete tabOverrides[String(entry.tabId)];
+          persistTabOverride(entry.tabId, null)
+            .then(() => {
+              renderTabOverrides().catch(() => {
+                setStatus("Could not render tab overrides.");
+              });
+            })
+            .catch(() => {
+              setStatus("Could not clear tab override.");
+            });
+        }
+      });
+
+      tabOverridesList.appendChild(item);
+    }
   }
-
-  async function updateTabOverride(nextOverride) {
-    tabOverride = normalizeTabOverride(nextOverride);
-    await persistTabOverride(tabOverride);
-    renderTabOverride();
-  }
-
-  tabSliderEl.addEventListener("input", () => {
-    tabValueEl.textContent = `${tabSliderEl.value}%`;
-    const nextOverride = normalizeTabOverride({
-      volume: Number(tabSliderEl.value),
-      muted: tabOverride ? tabOverride.muted : false
-    });
-
-    updateTabOverride(nextOverride).catch(() => {
-      setStatus("Could not save tab override.");
-    });
-  });
-
-  tabMuteEl.addEventListener("click", () => {
-    const nextOverride = normalizeTabOverride({
-      volume: tabOverride ? tabOverride.volume : Number(tabSliderEl.value),
-      muted: !(tabOverride && tabOverride.muted === true)
-    });
-
-    updateTabOverride(nextOverride).catch(() => {
-      setStatus("Could not save tab override.");
-    });
-  });
-
-  tabClearEl.addEventListener("click", () => {
-    updateTabOverride(null).catch(() => {
-      setStatus("Could not clear tab override.");
-    });
-  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -369,18 +464,20 @@
     sortRules();
 
     await resolveCurrentTab();
-    await readCurrentTabOverride();
+    await readTabOverrides();
 
     const defaultPattern = globalThis.VolumeMatcher.getDefaultPatternForUrl(currentUrl);
     patternInput.value = defaultPattern || "";
 
-    renderTabOverride();
     renderRules();
+    await renderTabOverrides();
   }
 
   initialize().catch(() => {
     setStatus("Could not load extension state.");
-    renderTabOverride();
     renderRules();
+    renderTabOverrides().catch(() => {
+      // Ignore initial render failures.
+    });
   });
 })();

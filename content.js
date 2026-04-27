@@ -25,7 +25,8 @@
 
     return {
       volume: clampPercent(candidate.volume),
-      muted: candidate.muted === true
+      muted: candidate.muted === true,
+      active: candidate.active !== false
     };
   }
 
@@ -87,7 +88,7 @@
   }
 
   function resolveEffectiveVolume() {
-    if (tabOverride) {
+    if (tabOverride && tabOverride.active !== false) {
       if (tabOverride.muted === true) {
         return 0;
       }
