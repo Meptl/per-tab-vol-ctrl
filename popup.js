@@ -117,14 +117,14 @@
     });
   }
 
-  async function applyRulesToActiveTab() {
+  async function applyRulesToActiveTab(nextRules) {
     const tabs = await tabsQuery({ active: true, currentWindow: true });
     const tab = tabs[0];
     if (!tab || !Number.isInteger(tab.id)) {
       return;
     }
 
-    await tabsSendMessage(tab.id, { type: "volumeRulesUpdated", rules });
+    await tabsSendMessage(tab.id, { type: "volumeRulesUpdated", rules: nextRules });
   }
 
   function setStatus(message) {
@@ -156,9 +156,9 @@
   }
 
   async function persistRules() {
-    rules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
-    await storageSet({ [RULES_KEY]: rules });
-    await applyRulesToActiveTab();
+    const normalizedRules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
+    await storageSet({ [RULES_KEY]: normalizedRules });
+    await applyRulesToActiveTab(normalizedRules);
   }
 
   async function refreshCurrentTab() {

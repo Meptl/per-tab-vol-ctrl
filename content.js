@@ -2,12 +2,20 @@
   const extApi = globalThis.browser || globalThis.chrome;
   const RULES_KEY = "volumeRules";
   let activeVolume = null;
-  const observedRoots = new WeakSet();
-  const ignoreNextVolumeChange = new WeakSet();
-  const VOLUME_EPSILON = 0.0001;
+  const mediaState = new WeakMap();
 
   function clampVolume(value) {
     return Math.max(0, Math.min(1, value));
+  }
+
+  function getOrCreateMediaState(media) {
+    const existing = mediaState.get(media);
+    if (existing) {
+      return existing;
+    }
+    const created = { baseVolume: clampVolume(media.volume), appliedPercent: null };
+    mediaState.set(media, created);
+    return created;
   }
 
   function storageGet(defaults) {
@@ -32,107 +40,57 @@
     });
   }
 
-  function getTargetVolume() {
-    if (!Number.isFinite(activeVolume)) {
-      return null;
-    }
-    return clampVolume(activeVolume / 100);
-  }
-
   function setMediaVolume(media) {
-    const targetVolume = getTargetVolume();
-    if (!Number.isFinite(targetVolume)) {
+    const state = getOrCreateMediaState(media);
+
+    if (!Number.isFinite(activeVolume)) {
+      if (state.appliedPercent !== null) {
+        media.volume = clampVolume(state.baseVolume);
+        state.appliedPercent = null;
+      }
       return;
     }
 
-    if (Math.abs(media.volume - targetVolume) <= VOLUME_EPSILON) {
-      return;
+    if (Number.isFinite(state.appliedPercent)) {
+      const previousFactor = clampVolume(state.appliedPercent / 100);
+      if (previousFactor > 0) {
+        state.baseVolume = clampVolume(media.volume / previousFactor);
+      }
+    } else {
+      state.baseVolume = clampVolume(media.volume);
     }
 
-    ignoreNextVolumeChange.add(media);
-    media.volume = targetVolume;
+    const currentFactor = clampVolume(activeVolume / 100);
+    media.volume = clampVolume(state.baseVolume * currentFactor);
+    state.appliedPercent = activeVolume;
   }
 
-  function applyVolumeToRoot(root) {
-    if (!root || typeof root.querySelectorAll !== "function") {
-      return;
-    }
-
-    const media = root.querySelectorAll("audio, video");
+  function applyVolumeToPage() {
+    const media = document.querySelectorAll("audio, video");
     for (const element of media) {
       setMediaVolume(element);
     }
   }
 
-  function forEachOpenShadowRoot(root, visitor) {
-    if (!root || typeof root.querySelectorAll !== "function") {
-      return;
-    }
-
-    const hosts = root.querySelectorAll("*");
-    for (const host of hosts) {
-      if (host.shadowRoot) {
-        visitor(host.shadowRoot);
-      }
-    }
-  }
-
-  function applyVolumeToPage() {
-    applyVolumeToRoot(document);
-    forEachOpenShadowRoot(document, (shadowRoot) => {
-      applyVolumeToRoot(shadowRoot);
-    });
-  }
-
   function observeNewMedia() {
-    let observer;
-
-    function observeRoot(root) {
-      if (!root || observedRoots.has(root)) {
-        return;
-      }
-
-      observedRoots.add(root);
-      observer.observe(root, { childList: true, subtree: true });
-    }
-
-    function inspectNode(node) {
-      if (!(node instanceof Element)) {
-        return;
-      }
-
-      if (node.matches && node.matches("audio, video")) {
-        setMediaVolume(node);
-      }
-
-      const nestedMedia = node.querySelectorAll ? node.querySelectorAll("audio, video") : [];
-      for (const element of nestedMedia) {
-        setMediaVolume(element);
-      }
-
-      if (node.shadowRoot) {
-        observeRoot(node.shadowRoot);
-        applyVolumeToRoot(node.shadowRoot);
-      }
-
-      forEachOpenShadowRoot(node, (shadowRoot) => {
-        observeRoot(shadowRoot);
-        applyVolumeToRoot(shadowRoot);
-      });
-    }
-
-    observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          inspectNode(node);
+          if (!(node instanceof Element)) {
+            continue;
+          }
+          if (node.matches && node.matches("audio, video")) {
+            setMediaVolume(node);
+          }
+          const nestedMedia = node.querySelectorAll ? node.querySelectorAll("audio, video") : [];
+          for (const element of nestedMedia) {
+            setMediaVolume(element);
+          }
         }
       }
     });
 
-    observeRoot(document.documentElement);
-    forEachOpenShadowRoot(document, (shadowRoot) => {
-      observeRoot(shadowRoot);
-    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
 
     document.addEventListener(
       "play",
@@ -153,12 +111,16 @@
           return;
         }
 
-        if (ignoreNextVolumeChange.has(target)) {
-          ignoreNextVolumeChange.delete(target);
+        const state = getOrCreateMediaState(target);
+        if (!Number.isFinite(activeVolume)) {
+          state.baseVolume = clampVolume(target.volume);
+          state.appliedPercent = null;
           return;
         }
 
-        setMediaVolume(target);
+        const factor = clampVolume(activeVolume / 100);
+        state.appliedPercent = activeVolume;
+        state.baseVolume = factor > 0 ? clampVolume(target.volume / factor) : state.baseVolume;
       },
       true
     );
@@ -189,30 +151,7 @@
     });
   }
 
-  function watchRuntimeMessages() {
-    if (!extApi.runtime || !extApi.runtime.onMessage) {
-      return;
-    }
-
-    extApi.runtime.onMessage.addListener((message) => {
-      if (!message || message.type !== "volumeRulesUpdated") {
-        return;
-      }
-
-      const rules = globalThis.VolumeMatcher.normalizeStoredRules(message.rules);
-      const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
-      if (matched && matched.muted === true) {
-        activeVolume = 0;
-      } else {
-        activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
-      }
-
-      applyVolumeToPage();
-    });
-  }
-
   refreshVolumeFromRules();
   observeNewMedia();
   watchRuleChanges();
-  watchRuntimeMessages();
 })();
