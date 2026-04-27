@@ -107,7 +107,7 @@ button {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid;
+  border: none;
   border-radius: 0;
   font-size: 12px;
   line-height: 1;
