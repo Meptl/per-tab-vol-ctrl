@@ -4,6 +4,7 @@
   const TAB_OVERRIDES_KEY = "tabVolumeOverrides";
   const rulesList = document.getElementById("rules-list");
   const tabOverridesList = document.getElementById("tab-overrides-list");
+  const addTabOverrideBtn = document.getElementById("add-tab-override-btn");
   const form = document.getElementById("add-rule-form");
   const patternInput = document.getElementById("pattern-input");
   const statusEl = document.getElementById("status");
@@ -356,7 +357,7 @@
       .filter(Boolean);
 
     if (entries.length === 0) {
-      tabOverridesList.appendChild(createEmptyMessage("No tab overrides yet. Use tab context menu: Set tab volume."));
+      tabOverridesList.appendChild(createEmptyMessage("No tab overrides yet."));
       return;
     }
 
@@ -451,6 +452,36 @@
       tabOverridesList.appendChild(item);
     }
   }
+
+  addTabOverrideBtn.addEventListener("click", () => {
+    setStatus("");
+
+    if (!Number.isInteger(currentTabId)) {
+      setStatus("Could not resolve current tab.");
+      return;
+    }
+
+    if (tabOverrides[String(currentTabId)]) {
+      setStatus("Current tab already has an override.");
+      return;
+    }
+
+    const nextOverride = {
+      volume: 100,
+      muted: false,
+      active: true
+    };
+
+    tabOverrides[String(currentTabId)] = nextOverride;
+    persistTabOverride(currentTabId, nextOverride)
+      .then(() => {
+        renderRules();
+        return renderTabOverrides();
+      })
+      .catch(() => {
+        setStatus("Could not save tab override.");
+      });
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

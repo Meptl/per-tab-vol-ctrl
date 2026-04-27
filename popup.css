@@ -25,6 +25,10 @@ h2 {
   margin-bottom: 10px;
 }
 
+.add-tab-override-btn {
+  margin: 0 0 10px;
+}
+
 .add-rule-form {
   margin-bottom: 10px;
 }
