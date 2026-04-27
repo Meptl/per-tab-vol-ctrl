@@ -1,5 +1,6 @@
 :root {
   font-family: "Segoe UI", sans-serif;
+  --border-color: #d1d5db;
 }
 
 body {
@@ -51,11 +52,13 @@ input[type="text"] {
   flex: 1;
   padding: 8px;
   border: 1px solid;
+  border-color: var(--border-color);
   font-size: 13px;
 }
 
 button {
   border: 1px solid;
+  border-color: var(--border-color);
   border-radius: 0;
   padding: 8px 12px;
   font-weight: 600;
@@ -83,6 +86,7 @@ button {
 
 .rule-item + .rule-item {
   border-top: 1px solid;
+  border-top-color: var(--border-color);
 }
 
 .rule-row {
