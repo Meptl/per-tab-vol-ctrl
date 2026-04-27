@@ -134,36 +134,33 @@
       const li = document.createElement("li");
       li.className = "rule-item";
 
-      const header = document.createElement("div");
-      header.className = "rule-header";
+      const row = document.createElement("div");
+      row.className = "rule-row";
 
-      const left = document.createElement("div");
+      const meta = document.createElement("div");
+      meta.className = "rule-meta";
 
       const pattern = document.createElement("p");
       pattern.className = "pattern";
       pattern.textContent = rule.pattern;
-      left.appendChild(pattern);
+      meta.appendChild(pattern);
 
       const matchesCurrent = currentUrl && globalThis.VolumeMatcher.matchesPattern(rule.pattern, currentUrl);
       if (matchesCurrent) {
         li.classList.add("rule-item-current");
       }
 
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "delete-btn";
-      remove.textContent = "Remove";
-      remove.addEventListener("click", async () => {
-        rules = rules.filter((item) => item.pattern !== rule.pattern);
+      const mute = document.createElement("button");
+      mute.type = "button";
+      mute.className = "mute-btn";
+      const isMuted = rule.muted === true;
+      mute.textContent = isMuted ? "🔇" : "🔊";
+      mute.setAttribute("aria-label", isMuted ? "Unmute rule" : "Mute rule");
+      mute.addEventListener("click", async () => {
+        rule.muted = !(rule.muted === true);
         await persistRules();
         renderRules();
       });
-
-      header.append(left, remove);
-      li.appendChild(header);
-
-      const sliderRow = document.createElement("div");
-      sliderRow.className = "slider-row";
 
       const slider = document.createElement("input");
       slider.type = "range";
@@ -173,10 +170,22 @@
       slider.value = String(Number.isFinite(rule.volume) ? rule.volume : 100);
 
       const value = document.createElement("output");
+      value.className = "volume-value";
       value.textContent = `${slider.value}%`;
 
       slider.addEventListener("input", () => {
         value.textContent = `${slider.value}%`;
+      });
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "delete-btn";
+      remove.textContent = "X";
+      remove.setAttribute("aria-label", `Remove ${rule.pattern}`);
+      remove.addEventListener("click", async () => {
+        rules = rules.filter((item) => item.pattern !== rule.pattern);
+        await persistRules();
+        renderRules();
       });
 
       slider.addEventListener("change", async () => {
@@ -185,8 +194,8 @@
         await persistRules();
       });
 
-      sliderRow.append(slider, value);
-      li.appendChild(sliderRow);
+      row.append(meta, mute, slider, value, remove);
+      li.appendChild(row);
 
       rulesList.appendChild(li);
     }
@@ -204,7 +213,7 @@
         return;
       }
 
-      rules.push({ pattern: normalized, volume: 100 });
+      rules.push({ pattern: normalized, volume: 100, muted: false });
       sortRules();
       await persistRules();
       renderRules();

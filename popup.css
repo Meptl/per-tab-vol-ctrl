@@ -84,18 +84,28 @@ button {
   padding: 8px;
 }
 
-.rule-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+.rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(88px, 120px) auto auto;
+  align-items: center;
   gap: 8px;
+}
+
+.rule-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .pattern {
   margin: 0;
   font-size: 12px;
   font-family: ui-monospace, monospace;
-  word-break: break-all;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rule-item-current {
@@ -103,18 +113,32 @@ button {
   border-color: #b9dfc4;
 }
 
+.mute-btn,
 .delete-btn {
-  background: #e45454;
-  font-size: 11px;
-  padding: 6px 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #c5cad8;
+  border-radius: 999px;
+  background: #fff;
+  color: #2f364c;
+  font-size: 12px;
+  line-height: 1;
 }
 
-.slider-row {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 8px;
+.mute-btn {
+  font-size: 13px;
+}
+
+.delete-btn {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.volume-value {
+  min-width: 38px;
+  font-size: 12px;
+  text-align: right;
 }
 
 input[type="range"] {

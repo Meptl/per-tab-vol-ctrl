@@ -131,7 +131,11 @@
       const stored = await storageGet({ [RULES_KEY]: [] });
       const rules = Array.isArray(stored[RULES_KEY]) ? stored[RULES_KEY] : [];
       const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
-      activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+      if (matched && matched.muted === true) {
+        activeVolume = 0;
+      } else {
+        activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+      }
       applyVolumeToPage();
     } catch {
       // Ignore storage read failures and keep default volume.
