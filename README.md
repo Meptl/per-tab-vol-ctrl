@@ -1,6 +1,6 @@
 # per-tab-vol-ctrl
 
-Firefox extension for per-domain tab volume control.
+Firefox extension for per-tab and per-domain tab volume control.
 
 ## Icon Attribution
 

@@ -2,11 +2,31 @@
   const extApi = globalThis.browser || globalThis.chrome;
   const RULES_KEY = "volumeRules";
   const VOLUME_EPSILON = 0.0001;
+  let domainRuleVolume = null;
+  let tabOverride = null;
   let activeVolume = null;
   const mediaState = new WeakMap();
 
   function clampVolume(value) {
     return Math.max(0, Math.min(1, value));
+  }
+
+  function clampPercent(value) {
+    if (!Number.isFinite(value)) {
+      return 100;
+    }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  function normalizeTabOverride(candidate) {
+    if (!candidate || typeof candidate !== "object") {
+      return null;
+    }
+
+    return {
+      volume: clampPercent(candidate.volume),
+      muted: candidate.muted === true
+    };
   }
 
   function getOrCreateMediaState(media) {
@@ -20,25 +40,11 @@
   }
 
   function storageGet(defaults) {
-    try {
-      const maybePromise = extApi.storage.local.get(defaults);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        return maybePromise;
-      }
-    } catch {
-      // Ignore and fall back to callback style.
-    }
+    return extApi.storage.local.get(defaults);
+  }
 
-    return new Promise((resolve, reject) => {
-      extApi.storage.local.get(defaults, (result) => {
-        const error = extApi.runtime && extApi.runtime.lastError;
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(result);
-      });
-    });
+  function runtimeSendMessage(message) {
+    return extApi.runtime.sendMessage(message);
   }
 
   function setMediaVolume(media) {
@@ -78,6 +84,45 @@
     for (const element of media) {
       setMediaVolume(element);
     }
+  }
+
+  function resolveEffectiveVolume() {
+    if (tabOverride) {
+      if (tabOverride.muted === true) {
+        return 0;
+      }
+      return tabOverride.volume === 100 ? null : tabOverride.volume;
+    }
+
+    return domainRuleVolume;
+  }
+
+  function applyResolvedVolume() {
+    activeVolume = resolveEffectiveVolume();
+    applyVolumeToPage();
+  }
+
+  async function refreshDomainRuleVolume() {
+    const stored = await storageGet({ [RULES_KEY]: [] });
+    const rules = globalThis.VolumeMatcher.normalizeStoredRules(stored[RULES_KEY]);
+    const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
+    if (matched && matched.muted === true) {
+      domainRuleVolume = 0;
+      return;
+    }
+
+    const matchedVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+    domainRuleVolume = matchedVolume === 100 ? null : matchedVolume;
+  }
+
+  async function refreshTabOverrideFromBackground() {
+    const response = await runtimeSendMessage({ type: "getTabVolumeOverride" });
+    tabOverride = normalizeTabOverride(response && response.override);
+  }
+
+  async function refreshAllVolumeSources() {
+    await Promise.allSettled([refreshDomainRuleVolume(), refreshTabOverrideFromBackground()]);
+    applyResolvedVolume();
   }
 
   function observeNewMedia() {
@@ -140,33 +185,42 @@
     );
   }
 
-  async function refreshVolumeFromRules() {
-    try {
-      const stored = await storageGet({ [RULES_KEY]: [] });
-      const rules = globalThis.VolumeMatcher.normalizeStoredRules(stored[RULES_KEY]);
-      const matched = globalThis.VolumeMatcher.findBestRule(rules, location.href);
-      if (matched && matched.muted === true) {
-        activeVolume = 0;
-      } else {
-        const matchedVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
-        activeVolume = matchedVolume === 100 ? null : matchedVolume;
-      }
-      applyVolumeToPage();
-    } catch {
-      // Ignore storage read failures and keep default volume.
-    }
-  }
-
-  function watchRuleChanges() {
+  function watchVolumeConfigChanges() {
     extApi.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes[RULES_KEY]) {
+      if (areaName === "local" && changes[RULES_KEY]) {
+        refreshDomainRuleVolume()
+          .then(() => {
+            applyResolvedVolume();
+          })
+          .catch(() => {
+            // Ignore storage read failures.
+          });
+      }
+    });
+
+    extApi.runtime.onMessage.addListener((message) => {
+      if (!message || typeof message !== "object") {
         return;
       }
-      refreshVolumeFromRules();
+
+      if (message.type === "volumeRulesUpdated") {
+        refreshDomainRuleVolume()
+          .then(() => {
+            applyResolvedVolume();
+          })
+          .catch(() => {
+            // Ignore rules refresh failures.
+          });
+      }
+
+      if (message.type === "tabVolumeOverrideUpdated") {
+        tabOverride = normalizeTabOverride(message.override);
+        applyResolvedVolume();
+      }
     });
   }
 
-  refreshVolumeFromRules();
+  refreshAllVolumeSources();
   observeNewMedia();
-  watchRuleChanges();
+  watchVolumeConfigChanges();
 })();

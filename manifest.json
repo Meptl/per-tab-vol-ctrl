@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "per-tab-vol-ctrl",
   "version": "0.0.0.1",
-  "description": "Per-domain volume control for tabs.",
-  "permissions": ["storage", "tabs"],
+  "description": "Per-tab and per-domain volume control for tabs.",
+  "permissions": ["storage", "tabs", "menus"],
   "action": {
     "default_title": "per-tab-vol-ctrl",
     "default_popup": "popup.html",
@@ -37,6 +37,9 @@
       "run_at": "document_idle"
     }
   ],
+  "background": {
+    "scripts": ["background.js"]
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "per-tab-vol-ctrl@example.com"

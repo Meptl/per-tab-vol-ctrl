@@ -1,10 +1,17 @@
 (() => {
   const extApi = globalThis.browser || globalThis.chrome;
   const RULES_KEY = "volumeRules";
+  const TAB_OVERRIDES_KEY = "tabVolumeOverrides";
   const rulesList = document.getElementById("rules-list");
   const form = document.getElementById("add-rule-form");
   const patternInput = document.getElementById("pattern-input");
   const statusEl = document.getElementById("status");
+  const tabLabelEl = document.getElementById("tab-label");
+  const tabSliderEl = document.getElementById("tab-volume-slider");
+  const tabValueEl = document.getElementById("tab-volume-value");
+  const tabMuteEl = document.getElementById("tab-mute-btn");
+  const tabClearEl = document.getElementById("tab-clear-btn");
+  const tabStateEl = document.getElementById("tab-state");
   const SVG_NS = "http://www.w3.org/2000/svg";
   const ICON_PATHS = {
     volume: [
@@ -26,71 +33,53 @@
 
   let rules = [];
   let currentUrl = "";
+  let currentTabId = null;
+  let tabOverride = null;
 
-  function storageGet(defaults) {
-    try {
-      const maybePromise = extApi.storage.local.get(defaults);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        return maybePromise;
-      }
-    } catch {
-      // Ignore and fall back to callback style.
+  function clampPercent(value) {
+    if (!Number.isFinite(value)) {
+      return 100;
+    }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+
+  function normalizeTabOverride(candidate) {
+    if (!candidate || typeof candidate !== "object") {
+      return null;
     }
 
-    return new Promise((resolve, reject) => {
-      extApi.storage.local.get(defaults, (result) => {
-        const error = extApi.runtime && extApi.runtime.lastError;
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(result);
-      });
-    });
+    return {
+      volume: clampPercent(candidate.volume),
+      muted: candidate.muted === true
+    };
+  }
+
+  function storageGet(defaults) {
+    return extApi.storage.local.get(defaults);
   }
 
   function storageSet(items) {
-    try {
-      const maybePromise = extApi.storage.local.set(items);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        return maybePromise;
-      }
-    } catch {
-      // Ignore and fall back to callback style.
-    }
+    return extApi.storage.local.set(items);
+  }
 
-    return new Promise((resolve, reject) => {
-      extApi.storage.local.set(items, () => {
-        const error = extApi.runtime && extApi.runtime.lastError;
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
+  function storageSessionGet(defaults) {
+    return extApi.storage.session.get(defaults);
+  }
+
+  function storageSessionSet(items) {
+    return extApi.storage.session.set(items);
+  }
+
+  function runtimeSendMessage(message) {
+    return extApi.runtime.sendMessage(message);
   }
 
   function tabsQuery(queryInfo) {
-    try {
-      const maybePromise = extApi.tabs.query(queryInfo);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        return maybePromise;
-      }
-    } catch {
-      // Ignore and fall back to callback style.
-    }
+    return extApi.tabs.query(queryInfo);
+  }
 
-    return new Promise((resolve, reject) => {
-      extApi.tabs.query(queryInfo, (tabs) => {
-        const error = extApi.runtime && extApi.runtime.lastError;
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(tabs || []);
-      });
-    });
+  function tabsGet(tabId) {
+    return extApi.tabs.get(tabId);
   }
 
   function tabsSendMessage(tabId, message) {
@@ -98,33 +87,15 @@
       return Promise.resolve();
     }
 
-    try {
-      const maybePromise = extApi.tabs.sendMessage(tabId, message);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        return maybePromise.catch(() => {
-          // Ignore when the active tab has no content script.
-        });
-      }
-    } catch {
-      // Ignore and fall back to callback style.
-    }
-
-    return new Promise((resolve) => {
-      extApi.tabs.sendMessage(tabId, message, () => {
-        // Ignore lastError: active tab might not have a content script.
-        resolve();
-      });
+    return extApi.tabs.sendMessage(tabId, message).catch(() => {
+      // Ignore when a tab has no content script.
     });
   }
 
-  async function applyRulesToActiveTab(nextRules) {
-    const tabs = await tabsQuery({ active: true, currentWindow: true });
-    const tab = tabs[0];
-    if (!tab || !Number.isInteger(tab.id)) {
-      return;
-    }
-
-    await tabsSendMessage(tab.id, { type: "volumeRulesUpdated", rules: nextRules });
+  async function persistRules() {
+    const normalizedRules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
+    await storageSet({ [RULES_KEY]: normalizedRules });
+    await tabsSendMessage(currentTabId, { type: "volumeRulesUpdated", rules: normalizedRules });
   }
 
   function setStatus(message) {
@@ -155,23 +126,61 @@
     return svg;
   }
 
-  async function persistRules() {
-    const normalizedRules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
-    await storageSet({ [RULES_KEY]: normalizedRules });
-    await applyRulesToActiveTab(normalizedRules);
-  }
+  async function resolveCurrentTab() {
+    let popupTabId = null;
+    try {
+      const response = await runtimeSendMessage({ type: "getEffectivePopupTabId" });
+      popupTabId = response && Number.isInteger(response.popupTabId) ? response.popupTabId : null;
+    } catch {
+      // Ignore and fall back to active tab.
+    }
 
-  async function refreshCurrentTab() {
-    const tabs = await tabsQuery({ active: true, currentWindow: true });
-    const tab = tabs[0];
-    currentUrl = tab && tab.url ? tab.url : "";
-
-    if (currentUrl) {
-      const defaultPattern = globalThis.VolumeMatcher.getDefaultPatternForUrl(currentUrl);
-      if (defaultPattern) {
-        patternInput.value = defaultPattern;
+    if (Number.isInteger(popupTabId)) {
+      try {
+        const tab = await tabsGet(popupTabId);
+        if (tab && Number.isInteger(tab.id)) {
+          currentTabId = tab.id;
+          currentUrl = tab.url || "";
+          return;
+        }
+      } catch {
+        // Ignore and fall back to active tab.
       }
     }
+
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    currentTabId = tab && Number.isInteger(tab.id) ? tab.id : null;
+    currentUrl = tab && tab.url ? tab.url : "";
+  }
+
+  async function readCurrentTabOverride() {
+    if (!Number.isInteger(currentTabId)) {
+      tabOverride = null;
+      return;
+    }
+
+    const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
+    const overrides = stored[TAB_OVERRIDES_KEY] || {};
+    tabOverride = normalizeTabOverride(overrides[String(currentTabId)]);
+  }
+
+  async function persistTabOverride(nextOverride) {
+    if (!Number.isInteger(currentTabId)) {
+      return;
+    }
+
+    const stored = await storageSessionGet({ [TAB_OVERRIDES_KEY]: {} });
+    const overrides = stored[TAB_OVERRIDES_KEY] || {};
+    const nextOverrides = { ...overrides };
+    if (nextOverride) {
+      nextOverrides[String(currentTabId)] = nextOverride;
+    } else {
+      delete nextOverrides[String(currentTabId)];
+    }
+
+    await storageSessionSet({ [TAB_OVERRIDES_KEY]: nextOverrides });
+    await tabsSendMessage(currentTabId, { type: "tabVolumeOverrideUpdated", override: nextOverride });
   }
 
   function createEmptyMessage() {
@@ -272,6 +281,65 @@
     }
   }
 
+  function renderTabOverride() {
+    const hasTab = Number.isInteger(currentTabId);
+    tabSliderEl.disabled = !hasTab;
+    tabMuteEl.disabled = !hasTab;
+    tabClearEl.disabled = !hasTab;
+
+    if (!hasTab) {
+      tabLabelEl.textContent = "No tab selected";
+      tabSliderEl.value = "100";
+      tabValueEl.textContent = "100%";
+      tabStateEl.textContent = "Tab override unavailable";
+      tabMuteEl.textContent = "Mute";
+      return;
+    }
+
+    tabLabelEl.textContent = currentUrl || `Tab ${currentTabId}`;
+
+    const effective = tabOverride || { volume: 100, muted: false };
+    tabSliderEl.value = String(effective.volume);
+    tabValueEl.textContent = `${effective.volume}%`;
+    tabMuteEl.textContent = effective.muted ? "Unmute" : "Mute";
+    tabStateEl.textContent = tabOverride ? "Tab override is active" : "Using domain rule";
+  }
+
+  async function updateTabOverride(nextOverride) {
+    tabOverride = normalizeTabOverride(nextOverride);
+    await persistTabOverride(tabOverride);
+    renderTabOverride();
+  }
+
+  tabSliderEl.addEventListener("input", () => {
+    tabValueEl.textContent = `${tabSliderEl.value}%`;
+    const nextOverride = normalizeTabOverride({
+      volume: Number(tabSliderEl.value),
+      muted: tabOverride ? tabOverride.muted : false
+    });
+
+    updateTabOverride(nextOverride).catch(() => {
+      setStatus("Could not save tab override.");
+    });
+  });
+
+  tabMuteEl.addEventListener("click", () => {
+    const nextOverride = normalizeTabOverride({
+      volume: tabOverride ? tabOverride.volume : Number(tabSliderEl.value),
+      muted: !(tabOverride && tabOverride.muted === true)
+    });
+
+    updateTabOverride(nextOverride).catch(() => {
+      setStatus("Could not save tab override.");
+    });
+  });
+
+  tabClearEl.addEventListener("click", () => {
+    updateTabOverride(null).catch(() => {
+      setStatus("Could not clear tab override.");
+    });
+  });
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     setStatus("");
@@ -299,12 +367,20 @@
     const stored = await storageGet({ [RULES_KEY]: [] });
     rules = globalThis.VolumeMatcher.normalizeStoredRules(stored[RULES_KEY]);
     sortRules();
-    await refreshCurrentTab();
+
+    await resolveCurrentTab();
+    await readCurrentTabOverride();
+
+    const defaultPattern = globalThis.VolumeMatcher.getDefaultPatternForUrl(currentUrl);
+    patternInput.value = defaultPattern || "";
+
+    renderTabOverride();
     renderRules();
   }
 
   initialize().catch(() => {
     setStatus("Could not load extension state.");
+    renderTabOverride();
     renderRules();
   });
 })();

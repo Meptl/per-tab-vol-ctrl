@@ -16,6 +16,33 @@ h1 {
   font-size: 18px;
 }
 
+h2 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.tab-override {
+  border: 1px solid;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.tab-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-controls {
+  display: grid;
+  grid-template-columns: auto minmax(88px, 120px) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .add-rule-form {
   margin-bottom: 10px;
 }
