@@ -63,12 +63,13 @@
 
     const currentFactor = clampVolume(activeVolume / 100);
     const nextVolume = clampVolume(state.baseVolume * currentFactor);
-    if (Math.abs(media.volume - nextVolume) <= VOLUME_EPSILON) {
+    const shouldWriteVolume = Math.abs(media.volume - nextVolume) > VOLUME_EPSILON;
+    if (!shouldWriteVolume) {
       state.isApplyingVolume = false;
     } else {
       state.isApplyingVolume = true;
+      media.volume = nextVolume;
     }
-    media.volume = nextVolume;
     state.appliedPercent = activeVolume;
   }
 
@@ -147,7 +148,8 @@
       if (matched && matched.muted === true) {
         activeVolume = 0;
       } else {
-        activeVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+        const matchedVolume = matched && Number.isFinite(matched.volume) ? matched.volume : null;
+        activeVolume = matchedVolume === 100 ? null : matchedVolume;
       }
       applyVolumeToPage();
     } catch {
