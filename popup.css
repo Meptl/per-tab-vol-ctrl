@@ -115,12 +115,15 @@ button {
   line-height: 1;
 }
 
-.mute-btn {
-  font-size: 13px;
-}
-
 .delete-btn {
   font-weight: 700;
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  margin: 0 auto;
 }
 
 .volume-value {

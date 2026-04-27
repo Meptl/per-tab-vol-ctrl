@@ -5,6 +5,24 @@
   const form = document.getElementById("add-rule-form");
   const patternInput = document.getElementById("pattern-input");
   const statusEl = document.getElementById("status");
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const ICON_PATHS = {
+    volume: [
+      "M15 8a5 5 0 0 1 0 8",
+      "M17.7 5a9 9 0 0 1 0 14",
+      "M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5"
+    ],
+    volumeOff: [
+      "M15 8a5 5 0 0 1 1.912 4.934m-1.377 2.602a5 5 0 0 1 -.535 .464",
+      "M17.7 5a9 9 0 0 1 2.362 11.086m-1.676 2.299a9 9 0 0 1 -.686 .615",
+      "M9.069 5.054l.431 -.554a.8 .8 0 0 1 1.5 .5v2m0 4v8a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l1.294 -1.664",
+      "M3 3l18 18"
+    ],
+    x: [
+      "M18 6l-12 12",
+      "M6 6l12 12"
+    ]
+  };
 
   let rules = [];
   let currentUrl = "";
@@ -83,6 +101,26 @@
     rules.sort((a, b) => a.pattern.localeCompare(b.pattern));
   }
 
+  function createIcon(iconName) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "icon");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+
+    for (const d of ICON_PATHS[iconName]) {
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    }
+
+    return svg;
+  }
+
   async function persistRules() {
     rules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
     await storageSet({ [RULES_KEY]: rules });
@@ -154,7 +192,7 @@
       mute.type = "button";
       mute.className = "mute-btn";
       const isMuted = rule.muted === true;
-      mute.textContent = isMuted ? "🔇" : "🔊";
+      mute.appendChild(createIcon(isMuted ? "volumeOff" : "volume"));
       mute.setAttribute("aria-label", isMuted ? "Unmute rule" : "Mute rule");
       mute.addEventListener("click", async () => {
         rule.muted = !(rule.muted === true);
@@ -184,7 +222,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "delete-btn";
-      remove.textContent = "X";
+      remove.appendChild(createIcon("x"));
       remove.setAttribute("aria-label", `Remove ${rule.pattern}`);
       remove.addEventListener("click", async () => {
         rules = rules.filter((item) => item.pattern !== rule.pattern);
