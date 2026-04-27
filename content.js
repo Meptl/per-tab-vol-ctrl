@@ -1,6 +1,7 @@
 (() => {
   const extApi = globalThis.browser || globalThis.chrome;
   const RULES_KEY = "volumeRules";
+  const VOLUME_EPSILON = 0.0001;
   let activeVolume = null;
   const mediaState = new WeakMap();
 
@@ -13,7 +14,7 @@
     if (existing) {
       return existing;
     }
-    const created = { baseVolume: clampVolume(media.volume), appliedPercent: null };
+    const created = { baseVolume: clampVolume(media.volume), appliedPercent: null, isApplyingVolume: false };
     mediaState.set(media, created);
     return created;
   }
@@ -61,7 +62,13 @@
     }
 
     const currentFactor = clampVolume(activeVolume / 100);
-    media.volume = clampVolume(state.baseVolume * currentFactor);
+    const nextVolume = clampVolume(state.baseVolume * currentFactor);
+    if (Math.abs(media.volume - nextVolume) <= VOLUME_EPSILON) {
+      state.isApplyingVolume = false;
+    } else {
+      state.isApplyingVolume = true;
+    }
+    media.volume = nextVolume;
     state.appliedPercent = activeVolume;
   }
 
@@ -112,6 +119,11 @@
         }
 
         const state = getOrCreateMediaState(target);
+        if (state.isApplyingVolume) {
+          state.isApplyingVolume = false;
+          return;
+        }
+
         if (!Number.isFinite(activeVolume)) {
           state.baseVolume = clampVolume(target.volume);
           state.appliedPercent = null;
@@ -121,6 +133,7 @@
         const factor = clampVolume(activeVolume / 100);
         state.appliedPercent = activeVolume;
         state.baseVolume = factor > 0 ? clampVolume(target.volume / factor) : state.baseVolume;
+        setMediaVolume(target);
       },
       true
     );
