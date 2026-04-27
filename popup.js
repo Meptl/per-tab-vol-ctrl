@@ -93,6 +93,40 @@
     });
   }
 
+  function tabsSendMessage(tabId, message) {
+    if (!Number.isInteger(tabId)) {
+      return Promise.resolve();
+    }
+
+    try {
+      const maybePromise = extApi.tabs.sendMessage(tabId, message);
+      if (maybePromise && typeof maybePromise.then === "function") {
+        return maybePromise.catch(() => {
+          // Ignore when the active tab has no content script.
+        });
+      }
+    } catch {
+      // Ignore and fall back to callback style.
+    }
+
+    return new Promise((resolve) => {
+      extApi.tabs.sendMessage(tabId, message, () => {
+        // Ignore lastError: active tab might not have a content script.
+        resolve();
+      });
+    });
+  }
+
+  async function applyRulesToActiveTab() {
+    const tabs = await tabsQuery({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab || !Number.isInteger(tab.id)) {
+      return;
+    }
+
+    await tabsSendMessage(tab.id, { type: "volumeRulesUpdated", rules });
+  }
+
   function setStatus(message) {
     statusEl.textContent = message || "";
   }
@@ -124,6 +158,7 @@
   async function persistRules() {
     rules = globalThis.VolumeMatcher.normalizeStoredRules(rules);
     await storageSet({ [RULES_KEY]: rules });
+    await applyRulesToActiveTab();
   }
 
   async function refreshCurrentTab() {
