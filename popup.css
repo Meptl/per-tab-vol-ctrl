@@ -1,0 +1,134 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 360px;
+  background: #f7f8fb;
+  color: #1a1d29;
+}
+
+.app {
+  padding: 12px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.add-rule-form {
+  margin-bottom: 10px;
+}
+
+.add-rule-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #c5cad8;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: #0d66d0;
+  color: #fff;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #4d5570;
+}
+
+.current-url,
+.status {
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.status {
+  min-height: 16px;
+  color: #8b2e00;
+}
+
+.rules-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.rule-item {
+  background: #fff;
+  border: 1px solid #dde2ee;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.rule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pattern {
+  margin: 0;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+
+.tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: #daf0df;
+  color: #1f6a31;
+}
+
+.delete-btn {
+  background: #e45454;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+.slider-row {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="range"] {
+  width: 100%;
+}
+
+.empty {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #4d5570;
+}

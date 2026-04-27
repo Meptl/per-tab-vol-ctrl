@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Viboard",
+  "version": "0.0.0.1",
+  "description": "Per-domain volume control for tabs.",
+  "permissions": ["storage", "tabs"],
+  "action": {
+    "default_title": "Viboard",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["matcher.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "viboard@example.com"
+    }
+  }
+}

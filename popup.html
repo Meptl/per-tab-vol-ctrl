@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Viboard</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Domain Volumes</h1>
+
+      <form id="add-rule-form" class="add-rule-form">
+        <label for="pattern-input">Add domain pattern</label>
+        <div class="input-row">
+          <input id="pattern-input" name="pattern" type="text" required placeholder="*://example.com/*" />
+          <button type="submit">Add</button>
+        </div>
+        <p class="hint">Wildcards are supported, e.g. <code>*://*.example.com/*</code></p>
+      </form>
+
+      <p id="current-url" class="current-url"></p>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section>
+        <ul id="rules-list" class="rules-list"></ul>
+      </section>
+    </main>
+
+    <script src="matcher.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
