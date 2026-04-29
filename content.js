@@ -5,6 +5,7 @@
   let domainRuleVolume = null;
   let tabOverride = null;
   let activeVolume = null;
+  let sharedAudioContext = null;
   const mediaState = new WeakMap();
 
   function clampVolume(value) {
@@ -30,12 +31,33 @@
     };
   }
 
+  function getAudioContext() {
+    if (sharedAudioContext) {
+      return sharedAudioContext;
+    }
+
+    const AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AudioContextCtor) {
+      return null;
+    }
+
+    sharedAudioContext = new AudioContextCtor();
+    return sharedAudioContext;
+  }
+
   function getOrCreateMediaState(media) {
     const existing = mediaState.get(media);
     if (existing) {
       return existing;
     }
-    const created = { baseVolume: clampVolume(media.volume), appliedPercent: null, isApplyingVolume: false };
+
+    const created = {
+      gainNode: null,
+      sourceNode: null,
+      isConnected: false,
+      shouldBypass: false,
+      appliedPercent: null
+    };
     mediaState.set(media, created);
     return created;
   }
@@ -48,35 +70,51 @@
     return extApi.runtime.sendMessage(message);
   }
 
-  function setMediaVolume(media) {
-    const state = getOrCreateMediaState(media);
-
-    if (!Number.isFinite(activeVolume)) {
-      if (state.appliedPercent !== null) {
-        media.volume = clampVolume(state.baseVolume);
-        state.appliedPercent = null;
-      }
+  function ensureMediaGainNode(media, state) {
+    if (state.gainNode || state.shouldBypass) {
       return;
     }
 
-    if (Number.isFinite(state.appliedPercent)) {
-      const previousFactor = clampVolume(state.appliedPercent / 100);
-      if (previousFactor > 0) {
-        state.baseVolume = clampVolume(media.volume / previousFactor);
-      }
-    } else {
-      state.baseVolume = clampVolume(media.volume);
+    const context = getAudioContext();
+    if (!context) {
+      state.shouldBypass = true;
+      return;
     }
 
-    const currentFactor = clampVolume(activeVolume / 100);
-    const nextVolume = clampVolume(state.baseVolume * currentFactor);
-    const shouldWriteVolume = Math.abs(media.volume - nextVolume) > VOLUME_EPSILON;
-    if (!shouldWriteVolume) {
-      state.isApplyingVolume = false;
-    } else {
-      state.isApplyingVolume = true;
-      media.volume = nextVolume;
+    try {
+      state.sourceNode = context.createMediaElementSource(media);
+      state.gainNode = context.createGain();
+      state.sourceNode.connect(state.gainNode);
+      state.gainNode.connect(context.destination);
+      state.isConnected = true;
+    } catch {
+      state.shouldBypass = true;
     }
+  }
+
+  function resolveGainFactor() {
+    if (!Number.isFinite(activeVolume)) {
+      return 1;
+    }
+    return clampVolume(activeVolume / 100);
+  }
+
+  function setMediaVolume(media) {
+    const state = getOrCreateMediaState(media);
+    ensureMediaGainNode(media, state);
+
+    if (!state.gainNode || !state.isConnected) {
+      return;
+    }
+
+    const nextFactor = resolveGainFactor();
+    const currentFactor = clampVolume(state.gainNode.gain.value);
+    if (Math.abs(currentFactor - nextFactor) <= VOLUME_EPSILON) {
+      state.appliedPercent = activeVolume;
+      return;
+    }
+
+    state.gainNode.gain.value = nextFactor;
     state.appliedPercent = activeVolume;
   }
 
@@ -150,9 +188,18 @@
       "play",
       (event) => {
         const target = event.target;
-        if (target instanceof HTMLMediaElement) {
-          setMediaVolume(target);
+        if (!(target instanceof HTMLMediaElement)) {
+          return;
         }
+
+        const context = getAudioContext();
+        if (context && context.state === "suspended") {
+          context.resume().catch(() => {
+            // Ignore resume failures.
+          });
+        }
+
+        setMediaVolume(target);
       },
       true
     );
@@ -161,26 +208,9 @@
       "volumechange",
       (event) => {
         const target = event.target;
-        if (!(target instanceof HTMLMediaElement)) {
-          return;
+        if (target instanceof HTMLMediaElement) {
+          setMediaVolume(target);
         }
-
-        const state = getOrCreateMediaState(target);
-        if (state.isApplyingVolume) {
-          state.isApplyingVolume = false;
-          return;
-        }
-
-        if (!Number.isFinite(activeVolume)) {
-          state.baseVolume = clampVolume(target.volume);
-          state.appliedPercent = null;
-          return;
-        }
-
-        const factor = clampVolume(activeVolume / 100);
-        state.appliedPercent = activeVolume;
-        state.baseVolume = factor > 0 ? clampVolume(target.volume / factor) : state.baseVolume;
-        setMediaVolume(target);
       },
       true
     );
