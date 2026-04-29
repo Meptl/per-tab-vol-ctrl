@@ -99,7 +99,9 @@
     return clampVolume(activeVolume / 100);
   }
 
-  function setMediaVolume(media) {
+  function setMediaVolume(media, options = {}) {
+    const { allowAttach = false } = options;
+
     if (!Number.isFinite(activeVolume)) {
       const state = mediaState.get(media);
       if (state && state.gainNode && state.isConnected) {
@@ -110,7 +112,13 @@
     }
 
     const state = getOrCreateMediaState(media);
-    ensureMediaGainNode(media, state);
+    if (!state.gainNode && !state.shouldBypass && !allowAttach) {
+      return;
+    }
+
+    if (!state.gainNode && !state.shouldBypass) {
+      ensureMediaGainNode(media, state);
+    }
 
     if (!state.gainNode || !state.isConnected) {
       return;
@@ -130,7 +138,8 @@
   function applyVolumeToPage() {
     const media = document.querySelectorAll("audio, video");
     for (const element of media) {
-      setMediaVolume(element);
+      const shouldAttach = !element.paused || element.autoplay;
+      setMediaVolume(element, { allowAttach: shouldAttach });
     }
   }
 
@@ -212,7 +221,9 @@
           });
         }
 
-        setMediaVolume(target);
+        globalThis.setTimeout(() => {
+          setMediaVolume(target, { allowAttach: true });
+        }, 0);
       },
       true
     );
