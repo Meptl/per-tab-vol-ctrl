@@ -100,6 +100,15 @@
   }
 
   function setMediaVolume(media) {
+    if (!Number.isFinite(activeVolume)) {
+      const state = mediaState.get(media);
+      if (state && state.gainNode && state.isConnected) {
+        state.gainNode.gain.value = 1;
+        state.appliedPercent = null;
+      }
+      return;
+    }
+
     const state = getOrCreateMediaState(media);
     ensureMediaGainNode(media, state);
 
@@ -192,6 +201,10 @@
           return;
         }
 
+        if (!Number.isFinite(activeVolume)) {
+          return;
+        }
+
         const context = getAudioContext();
         if (context && context.state === "suspended") {
           context.resume().catch(() => {
@@ -208,6 +221,10 @@
       "volumechange",
       (event) => {
         const target = event.target;
+        if (!Number.isFinite(activeVolume)) {
+          return;
+        }
+
         if (target instanceof HTMLMediaElement) {
           setMediaVolume(target);
         }
